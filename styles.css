@@ -1,0 +1,93 @@
+.unread-dot-target {
+  min-width: 0;
+  line-height: inherit;
+}
+
+.unread-dot-explorer-target {
+  position: relative;
+  padding-inline-start: var(--unread-dot-offset, 13px);
+}
+
+.unread-dot-tab-target {
+  display: inline-flex;
+  align-items: center;
+}
+
+.unread-dot-stack {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: var(--unread-dot-stack-width, 7px);
+  height: 8px;
+  line-height: 0;
+  margin: 0;
+  flex-shrink: 0;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.unread-dot {
+  display: block;
+  width: 7px;
+  height: 7px;
+  min-width: 7px;
+  border-radius: 50%;
+  margin: 0;
+  padding: 0;
+  line-height: 0;
+  flex: 0 0 7px;
+  align-self: center;
+  transform: none;
+  pointer-events: none;
+}
+
+.unread-dot-file {
+  background-color: var(--interactive-accent);
+}
+
+.unread-dot-new {
+  background-color: #74B3F5;
+}
+
+.unread-dot-changed {
+  background-color: var(--interactive-accent);
+}
+
+.unread-dot-folder {
+  width: 6px;
+  height: 6px;
+  background-color: var(--text-accent);
+  opacity: 0.75;
+}
+
+.unread-dot-tab {
+  width: 6px;
+  height: 6px;
+  margin-left: 0;
+  margin-right: 0.35em;
+  transform: translateY(-0.06em);
+}
+
+.unread-dot-shape-circle {
+  border-radius: 999px;
+  transform: none;
+}
+
+.unread-dot-shape-rounded {
+  border-radius: 2px;
+  transform: none;
+}
+
+.unread-dot-shape-square {
+  border-radius: 0;
+  transform: none;
+}
+
+.unread-dot-shape-diamond {
+  border-radius: 1px;
+  transform: rotate(45deg);
+}
