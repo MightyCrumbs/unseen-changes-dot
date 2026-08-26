@@ -6,7 +6,7 @@ const DATA_VERSION = 8;
 const STORAGE_PREFIX = 'unseen-changes-dot:v8';
 const PLUGIN_ID = 'unseen-changes-dot';
 const LEGACY_SYNC_FILE_NAME = 'UnseenChangesState.json';
-const PLUGIN_VERSION = '1.0.27';
+const PLUGIN_VERSION = '1.0.28';
 const SEEN_TOMBSTONE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SEEN_PUBLISH_COOLDOWN_MS = 2000;
 const PULSE_IMPORT_YIELD_EVERY = 25;
@@ -47,6 +47,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     this._pathRefreshTimers = new Map();
     this._ignoredInspectionTimers = new Map();
     this._activeSeenTimers = new Map();
+    this._manualUnseenPaths = new Set();
     this._seenPulseMtimeByFile = new Map();
     this._recentSeenPublishes = new Map();
     this._syncPollTimer = null;
@@ -118,20 +119,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
       id: 'reset-unseen-state-baseline',
       name: 'Reset unseen state baseline',
       callback: async () => {
-        this.data = this.createEmptyData();
-
-        for (const file of this.app.vault.getFiles()) {
-          if (!this.isTrackableFile(file)) continue;
-          this.data.seenSignatureByPath[file.path] = await this.getBaselineSignature(file);
-        }
-
-        this.data.signaturesInitialized = true;
-        this.rebuildLegacyRuntimeMaps(this.data);
-
-        await this.saveLocalData({ forceOverwriteSyncFile: true });
-
-        this.invalidateFolderMap();
-        this.refreshAllDots();
+        await this.resetUnseenStateBaseline();
 
         new obsidian.Notice('Unseen Changes Dot baseline reset');
       }
@@ -161,7 +149,10 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
         const file = this.getFrontFile();
         if (!this.isTrackableFile(file)) return false;
 
-        if (!checking) this.markFileSeen(file, { overrideStartupDelay: true });
+        if (!checking) {
+          this.markFileSeen(file, { overrideStartupDelay: true })
+            .catch((error) => console.warn('Unseen Changes Dot: could not mark current file as seen', error));
+        }
         return true;
       }
     });
@@ -180,6 +171,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
 
     this.registerEvent(
       this.app.workspace.on('active-leaf-change', () => {
+        this.releaseManualUnseenHolds();
         this.scheduleActiveSeenPublishes();
         this.scheduleExplorerRefreshBurst();
       })
@@ -187,6 +179,8 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
 
     this.registerEvent(
       this.app.workspace.on('file-open', (file) => {
+        this.releaseManualUnseenHolds(file?.path || null);
+
         if (this.isTrackableFile(file)) {
           this.scheduleFileSeenPublishes(file);
           this.scheduleExplorerRefreshBurst();
@@ -238,13 +232,19 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     this.registerEvent(
       this.app.workspace.on('file-menu', (menu, abstractFile) => {
         if (abstractFile instanceof obsidian.TFile) {
+          const currentState = this.getPathState(abstractFile.path);
+          const isMarkedUnseen = currentState === 'new' || currentState === 'changed';
+
           menu.addItem((item) => {
             item
-              .setTitle(this.isUnseen(abstractFile) ? 'Mark as seen' : 'Mark as unseen')
-              .setIcon(this.isUnseen(abstractFile) ? 'check' : 'dot')
-              .onClick(() => {
-                if (this.isUnseen(abstractFile)) this.markFileSeen(abstractFile, { overrideStartupDelay: true });
-                else this.markFileUnseen(abstractFile, 'changed');
+              .setTitle(isMarkedUnseen ? 'Mark as seen' : 'Mark as unseen')
+              .setIcon(isMarkedUnseen ? 'check' : 'dot')
+              .onClick(async () => {
+                if (isMarkedUnseen) {
+                  await this.markFileSeen(abstractFile, { overrideStartupDelay: true });
+                } else {
+                  this.markFileUnseen(abstractFile, 'changed');
+                }
               });
           });
 
@@ -366,6 +366,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     }
 
     this._activeSeenTimers.clear();
+    this._manualUnseenPaths.clear();
     this._seenPulseMtimeByFile.clear();
     this._recentSeenPublishes.clear();
 
@@ -389,6 +390,25 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
 
   createDefaultSettings() {
     return { ...DEFAULT_SETTINGS };
+  }
+
+  async resetUnseenStateBaseline() {
+    const currentSettings = { ...this.settings };
+    this.data = this.createEmptyData();
+    this.data.settings = currentSettings;
+
+    for (const file of this.app.vault.getFiles()) {
+      if (!this.isTrackableFile(file)) continue;
+      this.data.seenSignatureByPath[file.path] = await this.getBaselineSignature(file);
+    }
+
+    this.data.signaturesInitialized = true;
+    this.rebuildLegacyRuntimeMaps(this.data);
+
+    await this.saveLocalData({ forceOverwriteSyncFile: true });
+
+    this.invalidateFolderMap();
+    this.refreshAllDots();
   }
 
   normalizeSettings(settings) {
@@ -789,9 +809,8 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
   async readSyncFile() {
     try {
       const data = await this.loadData();
-      if (!data) return null;
-
-      return this.normalizeData(data);
+      const normalized = this.normalizeData(data);
+      if (normalized) return normalized;
     } catch (error) {
       console.warn('Unseen Changes Dot: could not read plugin data', error);
     }
@@ -803,11 +822,11 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     const adapter = this.app?.vault?.adapter;
     if (!adapter) return null;
 
-    try {
-      if (typeof adapter.read !== 'function') return null;
-      const candidatePaths = [this.syncFilePath, this.legacySyncFilePath];
+    if (typeof adapter.read !== 'function') return null;
+    const candidatePaths = [this.syncFilePath, this.legacySyncFilePath];
 
-      for (const candidatePath of candidatePaths) {
+    for (const candidatePath of candidatePaths) {
+      try {
         if (typeof adapter.exists === 'function' && !(await adapter.exists(candidatePath))) {
           continue;
         }
@@ -815,14 +834,14 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
         const raw = await adapter.read(candidatePath);
         if (!raw) continue;
 
-        return this.normalizeData(JSON.parse(raw));
+        const normalized = this.normalizeData(JSON.parse(raw));
+        if (normalized) return normalized;
+      } catch (error) {
+        console.warn(`Unseen Changes Dot: could not read sync candidate ${candidatePath}`, error);
       }
-
-      return null;
-    } catch (error) {
-      console.warn('Unseen Changes Dot: could not read sync file directly', error);
-      return null;
     }
+
+    return null;
   }
 
   async writeSyncFile(data) {
@@ -963,8 +982,24 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
           continue;
         }
 
-        const raw = await adapter.read(pulsePath);
-        const pulse = JSON.parse(raw);
+        let raw;
+
+        try {
+          raw = await adapter.read(pulsePath);
+        } catch (error) {
+          console.warn(`Unseen Changes Dot: could not read seen pulse ${pulsePath}`, error);
+          continue;
+        }
+
+        let pulse;
+
+        try {
+          pulse = JSON.parse(raw);
+        } catch (error) {
+          if (mtime) this._seenPulseMtimeByFile.set(pulsePath, mtime);
+          console.warn(`Unseen Changes Dot: could not parse seen pulse ${pulsePath}`, error);
+          continue;
+        }
 
         this._seenPulseMtimeByFile.set(pulsePath, mtime || Date.now());
 
@@ -1134,7 +1169,10 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     b = this.normalizeData(b) || this.createEmptyData();
 
     const stateByPath = {};
-    const ignoredByPath = { ...(a.ignoredByPath || {}), ...(b.ignoredByPath || {}) };
+    // Ignore state comes from the current local file content. Keeping the local
+    // view prevents stale sync data from re-ignoring a note after its task marker
+    // has been removed.
+    const ignoredByPath = { ...(a.ignoredByPath || {}) };
 
     const paths = new Set([
       ...Object.keys(a.stateByPath || {}),
@@ -1392,6 +1430,13 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
         }
       }
 
+      for (const path of options.deletedPaths || []) {
+        if (!path) continue;
+        this.deletePathState(path);
+        delete this.data.ignoredByPath[path];
+        delete this.data.seenSignatureByPath[path];
+      }
+
       this.data.updatedAt = now;
       this.rebuildLegacyRuntimeMaps(this.data);
 
@@ -1528,7 +1573,10 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
   markFileUnseen(file, state) {
     if (!this.isTrackableFile(file)) return;
     if (this.isIgnoredFile(file)) return;
-    if (this.isFileActive(file)) return;
+
+    if (this.isFileActive(file)) {
+      this._manualUnseenPaths.add(file.path);
+    }
 
     this.setUnseenState(file, state);
     this.refreshPathAndAncestors(file.path);
@@ -1541,6 +1589,8 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     if (!options.overrideStartupDelay && this.shouldDelayStartupUnreadSeen(file)) return;
 
     const path = file.path;
+    this._manualUnseenPaths.delete(path);
+
     if (this.startupUnseenPaths?.has(path)) {
       this.startupUnseenPaths.delete(path);
     }
@@ -1774,8 +1824,9 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     delete this.data.seenSignatureByPath[file.path];
 
     this.knownPaths.delete(file.path);
+    this._manualUnseenPaths.delete(file.path);
 
-    await this.saveLocalData();
+    await this.saveLocalData({ deletedPaths: [file.path] });
     this.scheduleRefresh();
     this.refreshTabDots();
   }
@@ -1805,9 +1856,14 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
       delete this.data.seenSignatureByPath[oldPath];
     }
 
+    if (oldPath && this._manualUnseenPaths.has(oldPath)) {
+      this._manualUnseenPaths.delete(oldPath);
+      if (file?.path) this._manualUnseenPaths.add(file.path);
+    }
+
     this.rebuildLegacyRuntimeMaps(this.data);
 
-    await this.saveLocalData();
+    await this.saveLocalData({ deletedPaths: oldPath ? [oldPath] : [] });
     this.scheduleRefresh();
     this.refreshTabDots();
 
@@ -1862,6 +1918,12 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     this.scheduleFileSeenPublishes(file);
   }
 
+  releaseManualUnseenHolds(activePath = this.getFrontFile()?.path || null) {
+    for (const path of this._manualUnseenPaths) {
+      if (path !== activePath) this._manualUnseenPaths.delete(path);
+    }
+  }
+
   scheduleFileSeenPublishes(file) {
     if (!this.isTrackableFile(file)) return;
 
@@ -1906,6 +1968,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     const targetFile = this.isTrackableFile(file) ? file : this.getFrontFile();
     if (!this.isTrackableFile(targetFile)) return;
     if (this.shouldDelayStartupUnreadSeen(targetFile)) return;
+    if (this._manualUnseenPaths.has(targetFile.path)) return;
 
     const state = this.getPathState(targetFile.path);
     const isUnseenState = state === 'new' || state === 'changed';

@@ -2,7 +2,7 @@
 
 Personal Obsidian dot plugin for Miguel's vault.
 
-Current packaged version: `1.0.23`.
+Current packaged version: `1.0.28`.
 
 Version numbering was rebased so legacy build `42` is treated as release `1`.
 
@@ -97,3 +97,25 @@ Then reload Obsidian and enable `Unseen Changes Dot`.
 Do not enable Reysu's `Unread Dot` and this plugin at the same time, or you may see duplicate dots.
 
 If anything looks wrong, run `Unseen Changes Dot: Reset unseen state baseline`.
+
+## Development
+
+The repository ships `main.js` directly. There is no compilation step and no
+runtime dependency installation.
+
+Run the local checks with Node.js 20 or newer:
+
+```sh
+npm test
+npm run check
+```
+
+Prepare a temporary isolated vault with the current plugin files:
+
+```sh
+npm run vault:prepare
+```
+
+The command creates the vault under the operating system's temporary directory.
+Open that generated directory as an Obsidian vault. It does not read or modify
+any existing vault.

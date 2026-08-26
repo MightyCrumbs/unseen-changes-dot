@@ -1,7 +1,7 @@
 {
   "id": "unseen-changes-dot",
   "name": "Unseen Changes Dot",
-  "version": "1.0.27",
+  "version": "1.0.28",
   "minAppVersion": "1.4.4",
   "description": "Shows device-local dots for new or changed notes you have not viewed yet, plus folder dots, without using note frontmatter.",
   "author": "Miguel Sousa / Codex",
