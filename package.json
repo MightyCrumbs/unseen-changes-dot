@@ -1,12 +1,14 @@
 {
   "name": "unseen-changes-dot",
-  "version": "1.0.28",
+  "version": "1.0.29",
   "private": true,
   "description": "Device-local unseen change indicators for Obsidian.",
   "scripts": {
     "test": "node --test",
-    "check": "node --check main.js && node --check scripts/prepare-test-vault.js && node --test",
-    "vault:prepare": "node scripts/prepare-test-vault.js"
+    "check": "node --check main.js && node --check scripts/prepare-test-vault.js && node --check scripts/validate-release.js && node --check scripts/prepare-release.js && node --test",
+    "vault:prepare": "node scripts/prepare-test-vault.js",
+    "release:check": "npm run check && node scripts/validate-release.js",
+    "release:prepare": "npm run release:check && node scripts/prepare-release.js"
   },
   "engines": {
     "node": ">=20"
