@@ -6,7 +6,7 @@ parent folders, and background tabs without modifying note frontmatter.
 
 ![Illustration of new and changed note markers](docs/unseen-changes-dot-preview.svg)
 
-Current packaged version: `1.0.30`.
+Current packaged version: `1.0.31`.
 
 ## What the markers mean
 
@@ -132,8 +132,12 @@ If the displayed state looks wrong, run
 
 ## Development
 
-The repository ships `main.js` directly. It has no runtime dependencies and no
-compilation step.
+The repository ships `main.js` directly. It has no runtime dependencies or
+compilation step. The build command checks the committed artefact's syntax:
+
+```sh
+npm run build
+```
 
 Run the checks with Node.js 20 or newer:
 

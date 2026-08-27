@@ -51,11 +51,11 @@ The Git tag must match the `version` in `manifest.json` exactly. Do not add a
 checks, prepares the packaged files, creates GitHub build-provenance
 attestations, and publishes the three assets.
 
-For version `1.0.30`:
+For version `1.0.31`:
 
 ```sh
-git tag 1.0.30
-git push origin 1.0.30
+git tag 1.0.31
+git push origin 1.0.31
 ```
 
 Wait for the `Release` workflow to pass. Download the three assets from the

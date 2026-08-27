@@ -1,17 +1,14 @@
-# Unseen Changes Dot 1.0.30
+# Unseen Changes Dot 1.0.31
 
-This release addresses the first automated Community directory review.
+This release completes the automated Community directory build checks.
 
 ## Included
 
-- Persisted state now uses Obsidian's plugin data API without browser local
-  storage.
-- The default startup inventory is limited to Markdown files. Attachment paths
-  are included only when attachment tracking is enabled.
-- GitHub Actions generates provenance attestations for the packaged release
-  assets.
-- A dependency lockfile lets the Community directory reproduce the package
-  checks.
+- Adds the deterministic `npm run build` command expected by the Community
+  directory. The command validates the committed `main.js`, which is both the
+  source and distributable artefact.
+- Keeps the storage, startup inventory, lockfile, and attested release changes
+  from version 1.0.30.
 
 ## Compatibility
 

@@ -2,6 +2,11 @@
 
 All notable changes to Unseen Changes Dot are recorded here.
 
+## 1.0.31 - 2026-08-27
+
+- Adds a deterministic build command for Community directory build
+  verification. The committed `main.js` remains the distributable artefact.
+
 ## 1.0.30 - 2026-08-27
 
 - Stores signatures and startup state through Obsidian's plugin data API and
