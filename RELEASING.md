@@ -1,7 +1,8 @@
 # Release procedure
 
-This repository does not publish automatically. Every public action is manual.
-Do not run the GitHub commands below until the maintainer approves publication.
+This repository validates, attests, and creates a GitHub release when an
+approved version tag is pushed. Do not push a tag until the maintainer approves
+publication.
 
 ## 1. Finish the release candidate
 
@@ -46,24 +47,26 @@ from the original project.
 ## 3. Create the GitHub release
 
 The Git tag must match the `version` in `manifest.json` exactly. Do not add a
-`v` prefix.
+`v` prefix. The workflow in `.github/workflows/release.yml` runs the release
+checks, prepares the packaged files, creates GitHub build-provenance
+attestations, and publishes the three assets.
 
-For version `1.0.29`:
+For version `1.0.30`:
 
 ```sh
-git tag 1.0.29
-git push origin 1.0.29
-gh release create 1.0.29 \
-  release/unseen-changes-dot-1.0.29/main.js \
-  release/unseen-changes-dot-1.0.29/manifest.json \
-  release/unseen-changes-dot-1.0.29/styles.css \
-  --repo MightyCrumbs/unseen-changes-dot \
-  --title "1.0.29" \
-  --notes-file RELEASE_NOTES.md
+git tag 1.0.30
+git push origin 1.0.30
 ```
 
-Download the three assets from the release page and compare their SHA-256
-checksums with the local `SHA256SUMS` file.
+Wait for the `Release` workflow to pass. Download the three assets from the
+release page, compare their SHA-256 checksums with the local `SHA256SUMS` file,
+and verify their attestations:
+
+```sh
+gh attestation verify main.js --repo MightyCrumbs/unseen-changes-dot
+gh attestation verify manifest.json --repo MightyCrumbs/unseen-changes-dot
+gh attestation verify styles.css --repo MightyCrumbs/unseen-changes-dot
+```
 
 ## 4. Submit to the Obsidian community directory
 
@@ -90,6 +93,8 @@ For each accepted update:
 2. Add the new version to `versions.json`.
 3. Update the changelog and release notes.
 4. Run `npm run release:prepare` and repeat the isolated-vault checks.
-5. Commit, tag, push, and create the matching GitHub release.
+5. Commit and push the accepted source, then push the matching tag. Confirm the
+   release workflow and artifact attestations before requesting a new directory
+   review.
 
 The initial directory submission is not repeated for normal updates.

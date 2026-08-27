@@ -70,7 +70,7 @@ const expectedSubmissionFields = [
   `- ID: \`${manifest.id}\``,
   `- Author: ${manifest.author}`,
   '- Repository: `MightyCrumbs/unseen-changes-dot`',
-  `- Initial public version: \`${manifest.version}\``,
+  `- Current public version: \`${manifest.version}\``,
   `- Minimum Obsidian version: \`${manifest.minAppVersion}\``
 ];
 

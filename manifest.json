@@ -1,7 +1,7 @@
 {
   "id": "unseen-changes-dot",
   "name": "Unseen Changes Dot",
-  "version": "1.0.29",
+  "version": "1.0.30",
   "minAppVersion": "1.4.4",
   "description": "Shows dots for new or changed notes you have not viewed yet, including folder and tab indicators, without editing note frontmatter.",
   "author": "Miguel Sousa",

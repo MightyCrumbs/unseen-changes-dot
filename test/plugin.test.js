@@ -55,6 +55,8 @@ function makePlugin() {
   plugin.app = {
     vault: {
       adapter: null,
+      getFiles: () => [],
+      getMarkdownFiles: () => [],
       getAbstractFileByPath: () => null
     }
   };
@@ -80,6 +82,49 @@ test('release metadata and runtime exclusions stay aligned', () => {
   assert.equal(versions[manifest.version], manifest.minAppVersion);
   assert.ok(gitignore.includes('data.json'));
   assert.ok(gitignore.includes('seen-pulses/'));
+  assert.equal(main.includes('localStorage'), false);
+  assert.equal(main.includes('sessionStorage'), false);
+});
+
+test('startup inventory stays on Markdown unless attachment tracking is enabled', () => {
+  const plugin = makePlugin();
+  const note = new TFile('note.md', 10, 100);
+  const image = new TFile('image.png', 20, 100);
+  let allFileCalls = 0;
+  let markdownFileCalls = 0;
+
+  plugin.app.vault.getMarkdownFiles = () => {
+    markdownFileCalls++;
+    return [note];
+  };
+  plugin.app.vault.getFiles = () => {
+    allFileCalls++;
+    return [note, image];
+  };
+
+  assert.deepEqual(plugin.getTrackableFiles(), [note]);
+  assert.equal(markdownFileCalls, 1);
+  assert.equal(allFileCalls, 0);
+
+  plugin.settings.trackAttachments = true;
+
+  assert.deepEqual(plugin.getTrackableFiles(), [note, image]);
+  assert.equal(markdownFileCalls, 1);
+  assert.equal(allFileCalls, 1);
+});
+
+test('plugin data API persists signatures and initialization state', async () => {
+  const plugin = makePlugin();
+  let savedData = null;
+
+  plugin.data.seenSignatureByPath['note.md'] = 'mdm:10:100';
+  plugin.data.signaturesInitialized = true;
+  plugin.saveData = async (data) => { savedData = data; };
+
+  await plugin.writeSyncFile(plugin.data);
+
+  assert.equal(savedData.seenSignatureByPath['note.md'], 'mdm:10:100');
+  assert.equal(savedData.signaturesInitialized, true);
 });
 
 test('settings normalization rejects unsupported values', () => {
@@ -137,8 +182,7 @@ test('baseline reset preserves the current settings', async () => {
   let savedOptions = null;
 
   plugin.settings = { ...plugin.settings, changedShape: 'square', syncPollingMs: 10000 };
-  plugin.app.vault.getFiles = () => [];
-  plugin.saveLocalData = async (options) => { savedOptions = options; };
+  plugin.savePluginData = async (options) => { savedOptions = options; };
   plugin.refreshAllDots = () => {};
 
   await plugin.resetUnseenStateBaseline();
@@ -162,7 +206,7 @@ test('manual unseen state survives while the file is active', async () => {
   plugin.app.metadataCache = { getFileCache: () => ({}) };
   plugin.refreshPathAndAncestors = () => {};
   plugin.refreshTabDots = () => {};
-  plugin.queueSaveLocalData = () => {};
+  plugin.queuePluginDataSave = () => {};
   plugin.markFileSeen = async () => { markSeenCalls++; };
 
   plugin.markFileUnseen(file, 'changed');
@@ -192,7 +236,6 @@ test('a stale synced ignore flag cannot re-ignore a locally unmarked note', () =
 test('saving after a rename cannot restore the old synced path', async () => {
   const plugin = makePlugin();
   const remote = plugin.createEmptyData();
-  const originalWindow = global.window;
   let writtenData = null;
 
   plugin.data.stateByPath['new.md'] = {
@@ -215,18 +258,12 @@ test('saving after a rename cannot restore the old synced path', async () => {
   };
   plugin.readSyncFile = async () => remote;
   plugin.writeSyncFile = async (data) => { writtenData = data; };
-  global.window = { localStorage: { setItem: () => {} } };
+  await plugin.savePluginData({ deletedPaths: ['old.md'] });
 
-  try {
-    await plugin.saveLocalData({ deletedPaths: ['old.md'] });
-
-    assert.equal(plugin.data.stateByPath['old.md'], undefined);
-    assert.equal(plugin.data.stateByPath['new.md'].state, 'changed');
-    assert.equal(plugin.data.stateByPath['remote.md'].state, 'new');
-    assert.equal(writtenData.stateByPath['old.md'], undefined);
-  } finally {
-    global.window = originalWindow;
-  }
+  assert.equal(plugin.data.stateByPath['old.md'], undefined);
+  assert.equal(plugin.data.stateByPath['new.md'].state, 'changed');
+  assert.equal(plugin.data.stateByPath['remote.md'].state, 'new');
+  assert.equal(writtenData.stateByPath['old.md'], undefined);
 });
 
 test('sync loading falls back through corrupt current data to valid legacy data', async () => {

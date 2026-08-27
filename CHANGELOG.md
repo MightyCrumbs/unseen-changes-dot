@@ -2,6 +2,14 @@
 
 All notable changes to Unseen Changes Dot are recorded here.
 
+## 1.0.30 - 2026-08-27
+
+- Stores signatures and startup state through Obsidian's plugin data API and
+  no longer uses browser local storage.
+- Limits the default startup inventory to Markdown files. Enabling attachment
+  tracking expands the inventory to other vault files.
+- Adds a tag-driven GitHub release workflow that attests packaged assets.
+
 ## 1.0.29 - 2026-08-27
 
 First public release candidate.

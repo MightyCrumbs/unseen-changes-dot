@@ -1,8 +1,8 @@
 {
   "name": "unseen-changes-dot",
-  "version": "1.0.29",
+  "version": "1.0.30",
   "private": true,
-  "description": "Device-local unseen change indicators for Obsidian.",
+  "description": "Vault-local unseen change indicators for Obsidian.",
   "scripts": {
     "test": "node --test",
     "check": "node --check main.js && node --check scripts/prepare-test-vault.js && node --check scripts/validate-release.js && node --check scripts/prepare-release.js && node --test",

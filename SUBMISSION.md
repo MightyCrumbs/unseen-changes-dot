@@ -1,6 +1,6 @@
 # Obsidian Community directory submission record
 
-Use this record only after the repository is public, release `1.0.29` exists,
+Use this record only after the repository is public, release `1.0.30` exists,
 and the derivative-work gate below is resolved.
 
 ## Directory metadata
@@ -12,6 +12,7 @@ and the derivative-work gate below is resolved.
 - Description: Shows dots for new or changed notes you have not viewed yet,
   including folder and tab indicators, without editing note frontmatter.
 - Initial public version: `1.0.29`
+- Current public version: `1.0.30`
 - Minimum Obsidian version: `1.4.4`
 - Desktop only: no
 
@@ -28,19 +29,19 @@ its current version as seen. It does not write state to note frontmatter.
 ## Data and network use
 
 The plugin makes no network requests and contains no telemetry. It stores file
-paths, signatures, timestamps, and seen state inside the vault configuration
-directory and Obsidian local storage. It does not store note content in its
-tracking files.
+paths, signatures, timestamps, and seen state through Obsidian's plugin data
+API inside the vault configuration directory. It does not store note content
+in its tracking files. At startup it lists Markdown paths, plus attachment
+paths only when attachment tracking is enabled, to detect offline changes.
 
 ## Validation evidence
 
 - Automated tests, syntax checks, release metadata checks, and release asset
-  hashes pass on Icarus Omarchy Linux.
-- Obsidian 1.13.7 passes the isolated-vault marker flows on Icarus Omarchy
-  Linux.
-- Obsidian 1.13.7 on the Windows VM hosted by Icarus Omarchy loads and enables
-  version 1.0.29 from the packaged assets. New, changed, folder aggregate, and
-  ignored-task states were checked visually.
+  hashes for version 1.0.30 pass on Icarus Omarchy Linux.
+- Obsidian 1.13.7 passed the isolated-vault marker flows for version 1.0.29 on
+  Icarus Omarchy Linux and the Windows VM hosted by Icarus Omarchy.
+- Repeat the native marker and storage migration checks for version 1.0.30 on
+  Icarus Omarchy Linux and that Windows VM before tagging the release.
 - The plugin was statically checked for Node.js and Electron-only APIs because
   `isDesktopOnly` is `false`.
 - The original MIT attribution for Unread Dot is preserved.
@@ -59,14 +60,14 @@ that review and update the attribution accurately.
 
 - [ ] Publicly verifiable approval from the Unread Dot author is recorded, or
       an independent clean-implementation review closes the derivative gate.
-- [ ] Repository visibility is public.
+- [x] Repository visibility is public.
 - [ ] `manifest.json` is accurate on the default branch.
-- [ ] Release `1.0.29` exists and its tag exactly matches `manifest.json`.
+- [ ] Release `1.0.30` exists and its tag exactly matches `manifest.json`.
 - [ ] The release has `main.js`, `manifest.json`, and `styles.css` as separate
       assets.
 - [ ] Downloaded release assets match the locally recorded checksums.
 - [x] Desktop testing passes in isolated Linux and Windows VM vaults.
 - [x] `unseen-changes-dot` was absent from the official directory on
       2026-08-27.
-- [ ] The owning Obsidian account is linked to the matching GitHub account.
-- [ ] Publication has explicit approval.
+- [x] The owning Obsidian account is linked to the matching GitHub account.
+- [x] Publication has explicit approval.

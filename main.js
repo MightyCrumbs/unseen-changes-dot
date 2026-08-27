@@ -3,10 +3,9 @@
 const obsidian = require('obsidian');
 
 const DATA_VERSION = 8;
-const STORAGE_PREFIX = 'unseen-changes-dot:v8';
 const PLUGIN_ID = 'unseen-changes-dot';
 const LEGACY_SYNC_FILE_NAME = 'UnseenChangesState.json';
-const PLUGIN_VERSION = '1.0.29';
+const PLUGIN_VERSION = '1.0.30';
 const SEEN_TOMBSTONE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SEEN_PUBLISH_COOLDOWN_MS = 2000;
 const PULSE_IMPORT_YIELD_EVERY = 25;
@@ -62,9 +61,8 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     this.seenPulseDir = obsidian.normalizePath(`${this.pluginConfigDir}/seen-pulses`);
 
     this.settings = this.createDefaultSettings();
-    this.storageKey = `${STORAGE_PREFIX}:${this.app.vault.getName()}`;
-    this.startupPaths = new Set(this.app.vault.getFiles().map((file) => file.path));
-    this.knownPaths = new Set(this.startupPaths);
+    this.startupPaths = new Set();
+    this.knownPaths = new Set();
     this.ignoreCreateEventsUntil = Date.now() + 3000;
     this.ignoreExistingFileEventsUntil = Date.now() + STARTUP_EXISTING_FILE_GRACE_MS;
     this.ignoreSeenUntil = Date.now() + STARTUP_SEEN_DELAY_MS;
@@ -129,13 +127,11 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
       id: 'show-storage-debug',
       name: 'Show storage debug',
       callback: async () => {
-        const localData = this.loadLocalData();
-        const syncData = await this.readSyncFile();
+        const pluginData = await this.readSyncFile();
 
         const message = [
           `memory ${this.countUnseen(this.data)}/${this.countSignatures(this.data)}`,
-          `plugin-data ${this.countUnseen(syncData)}/${this.countSignatures(syncData)}`,
-          `local ${this.countUnseen(localData)}/${this.countSignatures(localData)}`
+          `plugin-data ${this.countUnseen(pluginData)}/${this.countSignatures(pluginData)}`
         ].join(' | ');
 
         new obsidian.Notice(`Unseen Changes Dot storage: ${message}`, 12000);
@@ -274,7 +270,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
                 }
 
                 if (changed) {
-                  await this.saveLocalData();
+                  await this.savePluginData();
                   this.refreshAllDots();
                 }
 
@@ -296,7 +292,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
                   this.setPathState(file.path, 'changed');
                 }
 
-                await this.saveLocalData();
+                await this.savePluginData();
                 this.refreshAllDots();
 
                 new obsidian.Notice(`Marked ${trackableFiles.length} files as unseen`);
@@ -392,20 +388,32 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     return { ...DEFAULT_SETTINGS };
   }
 
+  getTrackableFiles() {
+    const files = this.settings.trackAttachments
+      ? this.app.vault.getFiles()
+      : this.app.vault.getMarkdownFiles();
+
+    return files.filter((file) => this.isTrackableFile(file));
+  }
+
+  captureStartupPaths() {
+    this.startupPaths = new Set(this.getTrackableFiles().map((file) => file.path));
+    this.knownPaths = new Set(this.startupPaths);
+  }
+
   async resetUnseenStateBaseline() {
     const currentSettings = { ...this.settings };
     this.data = this.createEmptyData();
     this.data.settings = currentSettings;
 
-    for (const file of this.app.vault.getFiles()) {
-      if (!this.isTrackableFile(file)) continue;
+    for (const file of this.getTrackableFiles()) {
       this.data.seenSignatureByPath[file.path] = await this.getBaselineSignature(file);
     }
 
     this.data.signaturesInitialized = true;
     this.rebuildLegacyRuntimeMaps(this.data);
 
-    await this.saveLocalData({ forceOverwriteSyncFile: true });
+    await this.savePluginData({ forceOverwriteSyncFile: true });
 
     this.invalidateFolderMap();
     this.refreshAllDots();
@@ -468,11 +476,12 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     this.startSyncPolling();
     this.invalidateFolderMap();
     this.refreshAllDots();
-    await this.saveLocalData({ forceOverwriteSyncFile: true });
+    await this.savePluginData({ forceOverwriteSyncFile: true });
 
     if (this.shouldHydrateAfterSettingsChange(previous, this.settings)) {
+      this.captureStartupPaths();
       this.data.signaturesInitialized = false;
-      await this.saveDeviceCaches();
+      await this.persistPluginDataSnapshot();
       this.scheduleStartupHydration(SETTINGS_HYDRATION_DELAY_MS);
     }
   }
@@ -484,6 +493,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
 
     try {
       this.data = await this.loadStoredData();
+      this.captureStartupPaths();
       this.startupUnseenPaths = new Set(Object.keys(this.data?.unseenByPath || {}));
       this.preserveStartupUnseenUntil = Date.now() + STARTUP_UNREAD_PRESERVE_MS;
       this._storageReady = true;
@@ -502,9 +512,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     let processed = 0;
     let changed = false;
 
-    for (const file of this.app.vault.getFiles()) {
-      if (!this.isMarkdownFile(file)) continue;
-      if (!this.isTrackableFile(file)) continue;
+    for (const file of this.getTrackableFiles()) {
       if (this.data.seenSignatureByPath[file.path]) continue;
 
       this.data.seenSignatureByPath[file.path] = await this.getBaselineSignature(file);
@@ -618,6 +626,8 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
       version: DATA_VERSION,
       stateByPath,
       ignoredByPath: normalized.ignoredByPath || {},
+      seenSignatureByPath: normalized.seenSignatureByPath || {},
+      signaturesInitialized: Boolean(normalized.signaturesInitialized),
       settings: this.normalizeSettings(normalized.settings),
       updatedAt: normalized.updatedAt || now
     };
@@ -718,33 +728,16 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     this.invalidateFolderMap();
   }
 
-  loadLocalData() {
-    try {
-      const value = window.localStorage.getItem(this.storageKey);
-      if (!value) return null;
-
-      return this.normalizeData(JSON.parse(value));
-    } catch (error) {
-      console.warn('Unseen Changes Dot: could not load local data', error);
-      return null;
-    }
-  }
-
   async loadStoredData() {
     const syncFileData = await this.readSyncFile();
-    let isNewSyncFile = false;
-    let prunedMissingEntries = false;
 
-    const localData = this.loadLocalData();
-    const settingsSource = syncFileData?.settings || localData?.settings || this.settings;
+    const settingsSource = syncFileData?.settings || this.settings;
     this.setSettings(settingsSource);
     let data;
 
     if (syncFileData) {
       data = this.normalizeData(syncFileData);
       data.settings = { ...this.settings };
-      data.seenSignatureByPath = localData?.seenSignatureByPath || {};
-      data.signaturesInitialized = localData?.signaturesInitialized || false;
       data = this.rebuildLegacyRuntimeMaps(data);
 
       this.data = data;
@@ -752,18 +745,13 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
 
       data = this.data;
     } else {
-      data = this.mergeStoredData([localData]) || this.createEmptyData();
-      isNewSyncFile = true;
+      data = this.createEmptyData();
     }
 
     data.settings = { ...this.settings };
     this.data = data;
-    prunedMissingEntries = this.pruneMissingRuntimeEntries();
-    await this.saveDeviceCaches();
-
-    if (isNewSyncFile || prunedMissingEntries) {
-      setTimeout(() => this.writeSyncFile(this.data), 1000);
-    }
+    this.pruneMissingRuntimeEntries();
+    await this.persistPluginDataSnapshot();
 
     return data;
   }
@@ -1304,7 +1292,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
       }
 
       if (stateChanged || ignoredChanged || signaturesChanged) {
-        await this.saveDeviceCaches();
+        await this.persistPluginDataSnapshot();
       }
 
       if (pulseChanges.stateChanged || reconciledChanged) {
@@ -1411,7 +1399,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     return currentSignature === seenSignature;
   }
 
-  async saveLocalData(options = {}) {
+  async savePluginData(options = {}) {
     if (this._saveTimer) {
       clearTimeout(this._saveTimer);
       this._saveTimer = null;
@@ -1440,33 +1428,23 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
       this.data.updatedAt = now;
       this.rebuildLegacyRuntimeMaps(this.data);
 
-      try {
-        window.localStorage.setItem(this.storageKey, JSON.stringify(this.data));
-      } catch (error) {
-        console.warn('Unseen Changes Dot: could not save local data', error);
-      }
-
       await this.writeSyncFile(this.data);
     } finally {
       this._isSaving = false;
     }
   }
 
-  async saveDeviceCaches() {
-    try {
-      this.rebuildLegacyRuntimeMaps(this.data);
-      window.localStorage.setItem(this.storageKey, JSON.stringify(this.data));
-    } catch (error) {
-      console.warn('Unseen Changes Dot: could not save local cache data', error);
-    }
+  async persistPluginDataSnapshot() {
+    this.rebuildLegacyRuntimeMaps(this.data);
+    await this.writeSyncFile(this.data);
   }
 
-  queueSaveLocalData(delay = 250) {
+  queuePluginDataSave(delay = 250) {
     if (this._saveTimer) clearTimeout(this._saveTimer);
 
     this._saveTimer = setTimeout(() => {
       this._saveTimer = null;
-      this.saveLocalData();
+      this.savePluginData();
     }, delay);
   }
 
@@ -1505,11 +1483,11 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
   async initializeSeenSignatures() {
     const changed = await this.populateMissingSeenSignatures();
     if (!changed && this.data.signaturesInitialized) {
-      await this.saveDeviceCaches();
+      await this.persistPluginDataSnapshot();
       return false;
     }
 
-    await this.saveDeviceCaches();
+    await this.persistPluginDataSnapshot();
     return changed;
   }
 
@@ -1581,7 +1559,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     this.setUnseenState(file, state);
     this.refreshPathAndAncestors(file.path);
     this.refreshTabDots();
-    this.queueSaveLocalData();
+    this.queuePluginDataSave();
   }
 
   async markFileSeen(file, options = {}) {
@@ -1621,12 +1599,12 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     }
 
     if (wasUnseen || stateChanged) {
-      await this.saveLocalData();
+      await this.savePluginData();
       return;
     }
 
     if (signatureChanged) {
-      await this.saveDeviceCaches();
+      await this.persistPluginDataSnapshot();
     }
   }
 
@@ -1654,7 +1632,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     this.refreshPathAndAncestors(file.path);
     this.refreshTabDots();
     this.schedulePathRefreshes(file.path);
-    this.queueSaveLocalData();
+    this.queuePluginDataSave();
   }
 
   isStartupExistingFile(file) {
@@ -1702,7 +1680,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     }
 
     if (changed) {
-      this.queueSaveLocalData(1000);
+      this.queuePluginDataSave(1000);
     }
 
     return changed;
@@ -1826,7 +1804,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
     this.knownPaths.delete(file.path);
     this._manualUnseenPaths.delete(file.path);
 
-    await this.saveLocalData({ deletedPaths: [file.path] });
+    await this.savePluginData({ deletedPaths: [file.path] });
     this.scheduleRefresh();
     this.refreshTabDots();
   }
@@ -1863,7 +1841,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
 
     this.rebuildLegacyRuntimeMaps(this.data);
 
-    await this.saveLocalData({ deletedPaths: oldPath ? [oldPath] : [] });
+    await this.savePluginData({ deletedPaths: oldPath ? [oldPath] : [] });
     this.scheduleRefresh();
     this.refreshTabDots();
 
@@ -2036,7 +2014,7 @@ class UnseenChangesDotPlugin extends obsidian.Plugin {
 
     if (changed) {
       this.invalidateFolderMap();
-      this.queueSaveLocalData();
+      this.queuePluginDataSave();
     }
 
     return ignored;

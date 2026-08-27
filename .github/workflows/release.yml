@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*.*.*'
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+
+      - name: Confirm tag matches manifest
+        shell: bash
+        run: |
+          manifest_version="$(node -p "require('./manifest.json').version")"
+          test "$GITHUB_REF_NAME" = "$manifest_version"
+
+      - name: Validate and prepare release assets
+        run: npm run release:prepare
+
+      - name: Attest release assets
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            release/unseen-changes-dot-${{ github.ref_name }}/main.js
+            release/unseen-changes-dot-${{ github.ref_name }}/manifest.json
+            release/unseen-changes-dot-${{ github.ref_name }}/styles.css
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_DIR: release/unseen-changes-dot-${{ github.ref_name }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "$RELEASE_DIR/main.js" \
+            "$RELEASE_DIR/manifest.json" \
+            "$RELEASE_DIR/styles.css" \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md

@@ -6,7 +6,7 @@ parent folders, and background tabs without modifying note frontmatter.
 
 ![Illustration of new and changed note markers](docs/unseen-changes-dot-preview.svg)
 
-Current packaged version: `1.0.29`.
+Current packaged version: `1.0.30`.
 
 ## What the markers mean
 
@@ -36,9 +36,13 @@ when it contains both new and changed files.
 ## Privacy and network access
 
 The plugin does not send data over the network and does not use analytics or
-telemetry. It reads vault file metadata and, for Markdown files, content needed
-to calculate signatures. It stores tracking data in the vault configuration
-directory and in Obsidian's local browser storage.
+telemetry. At startup it lists Markdown files to detect changes made while the
+plugin was not running. If attachment tracking is enabled, that startup list
+also includes non-Markdown files. The plugin reads Markdown content when it
+needs to calculate a signature.
+
+All persisted state uses Obsidian's plugin data API and stays in the vault
+configuration directory.
 
 No note content is written to the tracking files. The stored values contain
 paths, timestamps, sizes, signatures, and state used by the plugin.
@@ -57,12 +61,9 @@ Per-file seen pulses are stored in:
 <vault-config-dir>/plugins/unseen-changes-dot/seen-pulses/
 ```
 
-The plugin also keeps a device-local `localStorage` cache for seen signatures
-and startup state.
-
 If your sync service includes the vault configuration directory, `data.json`
 and `seen-pulses/` can sync between devices. The plugin reconciles synced state
-against the current file signatures and the device-local cache.
+against current file signatures.
 
 Do not include runtime state in a release package:
 
