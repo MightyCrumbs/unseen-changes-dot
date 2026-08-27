@@ -46,6 +46,10 @@ paths only when attachment tracking is enabled, to detect offline changes.
   used.
 - The plugin was statically checked for Node.js and Electron-only APIs because
   `isDesktopOnly` is `false`.
+- The Community directory review for version 1.0.31 completed successfully:
+  release attestations, network checks, dependencies, code obfuscation, and
+  byte-for-byte build reproduction passed. Vault enumeration remains a
+  recommendation because the plugin must inventory trackable paths.
 - The original MIT attribution for Unread Dot is preserved.
 
 ## Derivative-work gate
@@ -63,12 +67,12 @@ that review and update the attribution accurately.
 - [ ] Publicly verifiable approval from the Unread Dot author is recorded, or
       an independent clean-implementation review closes the derivative gate.
 - [x] Repository visibility is public.
-- [ ] `manifest.json` is accurate on the default branch.
-- [ ] Release `1.0.31` exists and its tag exactly matches `manifest.json`.
-- [ ] The release has `main.js`, `manifest.json`, and `styles.css` as separate
+- [x] `manifest.json` is accurate on the default branch.
+- [x] Release `1.0.31` exists and its tag exactly matches `manifest.json`.
+- [x] The release has `main.js`, `manifest.json`, and `styles.css` as separate
       assets.
-- [ ] Downloaded release assets match the locally recorded checksums.
-- [x] Desktop testing passes in isolated Linux and Windows VM vaults.
+- [x] Downloaded release assets match the locally recorded checksums.
+- [x] Baseline desktop testing passes in isolated Linux and Windows VM vaults.
 - [x] `unseen-changes-dot` was absent from the official directory on
       2026-08-27.
 - [x] The owning Obsidian account is linked to the matching GitHub account.
