@@ -35,6 +35,14 @@ These are external actions. Run them only after approval.
 3. Confirm that the public repository exposes the README, licence, source, and
    third-party notice.
 
+Before submitting to the Obsidian Community directory, resolve the derivative
+work gate. This project credits Unread Dot for inherited structure and the
+file-explorer marker approach. Obsidian's current developer policy requires
+publicly verifiable written approval from the original author for a fork or
+other inherited implementation. Do not submit until that evidence exists, or
+until an independently reviewed clean implementation no longer inherits code
+from the original project.
+
 ## 3. Create the GitHub release
 
 The Git tag must match the `version` in `manifest.json` exactly. Do not add a
@@ -59,22 +67,17 @@ checksums with the local `SHA256SUMS` file.
 
 ## 4. Submit to the Obsidian community directory
 
-1. Fork `obsidianmd/obsidian-releases`.
-2. Add this object to `community-plugins.json`:
-
-   ```json
-   {
-     "id": "unseen-changes-dot",
-     "name": "Unseen Changes Dot",
-     "author": "Miguel Sousa",
-     "description": "Shows dots for new or changed notes you have not viewed yet, including folder and tab indicators, without editing note frontmatter.",
-     "repo": "MightyCrumbs/unseen-changes-dot"
-   }
-   ```
-
-3. Open the submission pull request using the draft in `SUBMISSION.md`.
-4. Keep the release assets unchanged while the review is open.
-5. Address reviewer findings in a new release if they change packaged files.
+1. Sign in at `https://community.obsidian.md` with the Obsidian account that
+   will own the listing.
+2. Link the matching GitHub account to the community profile.
+3. Add the plugin through the Community directory. The directory reads
+   `manifest.json` from the HEAD of the repository's default branch.
+4. Confirm that the plugin ID is still unique, the repository is public, and
+   the GitHub release whose tag matches `manifest.json` contains `main.js`,
+   `manifest.json`, and `styles.css` as separate assets.
+5. Keep the release assets unchanged while automated review is running.
+6. Address findings in a new release with an incremented version whenever a
+   packaged file changes.
 
 Obsidian reads the latest version from `manifest.json` and downloads the files
 from the GitHub release with the identical tag.

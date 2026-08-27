@@ -2,7 +2,7 @@
 
 All notable changes to Unseen Changes Dot are recorded here.
 
-## 1.0.29 - Unreleased
+## 1.0.29 - 2026-08-27
 
 First public release candidate.
 

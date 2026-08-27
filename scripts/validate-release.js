@@ -51,6 +51,10 @@ assert(manifest.author === 'Miguel Sousa', 'Public manifest author must be Migue
 assert(manifest.authorUrl === 'https://github.com/MightyCrumbs', 'Unexpected authorUrl');
 assert(typeof manifest.description === 'string' && manifest.description.length > 0, 'Manifest description is required');
 assert(manifest.description.length <= 250, 'Manifest description exceeds 250 characters');
+assert(manifest.description.endsWith('.'), 'Manifest description must end with a period');
+assert(/^[a-z-]+$/.test(manifest.id), 'Plugin id may contain only lowercase letters and hyphens');
+assert(!manifest.id.includes('obsidian'), 'Plugin id must not contain obsidian');
+assert(!manifest.id.endsWith('plugin'), 'Plugin id must not end with plugin');
 assert(typeof manifest.isDesktopOnly === 'boolean', 'isDesktopOnly must be a boolean');
 assert(
   mainSource.includes(`const PLUGIN_VERSION = '${manifest.version}';`),
@@ -61,18 +65,23 @@ assert(readme.includes('THIRD_PARTY_NOTICES.md'), 'README must link to third-par
 assert(releaseNotes.startsWith(`# Unseen Changes Dot ${manifest.version}\n`), 'Release notes version does not match manifest.json');
 assert(fs.existsSync(path.join(root, 'docs', 'unseen-changes-dot-preview.svg')), 'README preview image is missing');
 
-const expectedRegistryFields = [
-  `"id": "${manifest.id}"`,
-  `"name": "${manifest.name}"`,
-  `"author": "${manifest.author}"`,
-  `"description": "${manifest.description}"`,
-  '"repo": "MightyCrumbs/unseen-changes-dot"'
+const expectedSubmissionFields = [
+  `- Name: ${manifest.name}`,
+  `- ID: \`${manifest.id}\``,
+  `- Author: ${manifest.author}`,
+  '- Repository: `MightyCrumbs/unseen-changes-dot`',
+  `- Initial public version: \`${manifest.version}\``,
+  `- Minimum Obsidian version: \`${manifest.minAppVersion}\``
 ];
 
-for (const expectedField of expectedRegistryFields) {
-  assert(releasing.includes(expectedField), `RELEASING.md is missing registry field: ${expectedField}`);
-  assert(submission.includes(expectedField), `SUBMISSION.md is missing registry field: ${expectedField}`);
+for (const expectedField of expectedSubmissionFields) {
+  assert(submission.includes(expectedField), `SUBMISSION.md is missing directory metadata: ${expectedField}`);
 }
+
+assert(releasing.includes('https://community.obsidian.md'), 'RELEASING.md is missing the current Community directory URL');
+assert(submission.includes('https://community.obsidian.md'), 'SUBMISSION.md is missing the current Community directory URL');
+assert(releasing.includes('derivative'), 'RELEASING.md must preserve the derivative-work gate');
+assert(submission.includes('Derivative-work gate'), 'SUBMISSION.md must preserve the derivative-work gate');
 
 for (const runtimePath of ['data.json', 'seen-pulses']) {
   assert(!fs.existsSync(path.join(root, runtimePath)), `Runtime state must not be packaged: ${runtimePath}`);
