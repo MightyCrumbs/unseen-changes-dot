@@ -69,6 +69,7 @@ test('release metadata and runtime exclusions stay aligned', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'manifest.json'), 'utf8'));
   const versions = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'versions.json'), 'utf8'));
   const packageData = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8'));
+  const packageLock = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package-lock.json'), 'utf8'));
   const main = fs.readFileSync(path.join(repositoryRoot, 'main.js'), 'utf8');
   const readme = fs.readFileSync(path.join(repositoryRoot, 'README.md'), 'utf8');
   const gitignore = fs.readFileSync(path.join(repositoryRoot, '.gitignore'), 'utf8').split(/\r?\n/);
@@ -79,6 +80,8 @@ test('release metadata and runtime exclusions stay aligned', () => {
   assert.equal(mainVersion, manifest.version);
   assert.equal(readmeVersion, manifest.version);
   assert.equal(packageData.version, manifest.version);
+  assert.equal(packageLock.version, manifest.version);
+  assert.equal(packageLock.packages[''].version, manifest.version);
   assert.equal(versions[manifest.version], manifest.minAppVersion);
   assert.ok(gitignore.includes('data.json'));
   assert.ok(gitignore.includes('seen-pulses/'));

@@ -10,6 +10,8 @@ This release addresses the first automated Community directory review.
   are included only when attachment tracking is enabled.
 - GitHub Actions generates provenance attestations for the packaged release
   assets.
+- A dependency lockfile lets the Community directory reproduce the package
+  checks.
 
 ## Compatibility
 

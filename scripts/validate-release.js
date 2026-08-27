@@ -17,6 +17,7 @@ function assert(condition, message) {
 
 const manifest = readJson('manifest.json');
 const packageJson = readJson('package.json');
+const packageLock = readJson('package-lock.json');
 const versions = readJson('versions.json');
 const mainSource = fs.readFileSync(path.join(root, 'main.js'), 'utf8');
 const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
@@ -27,6 +28,7 @@ const submission = fs.readFileSync(path.join(root, 'SUBMISSION.md'), 'utf8');
 const requiredFiles = [
   'main.js',
   'manifest.json',
+  'package-lock.json',
   'styles.css',
   'README.md',
   'LICENSE',
@@ -46,6 +48,8 @@ assert(manifest.id === 'unseen-changes-dot', 'Unexpected plugin id');
 assert(manifest.name === 'Unseen Changes Dot', 'Unexpected plugin name');
 assert(/^\d+\.\d+\.\d+$/.test(manifest.version), 'Manifest version must use x.y.z');
 assert(packageJson.version === manifest.version, 'package.json version does not match manifest.json');
+assert(packageLock.version === manifest.version, 'package-lock.json version does not match manifest.json');
+assert(packageLock.packages?.['']?.version === manifest.version, 'package-lock root version does not match manifest.json');
 assert(versions[manifest.version] === manifest.minAppVersion, 'versions.json does not map the current version to minAppVersion');
 assert(manifest.author === 'Miguel Sousa', 'Public manifest author must be Miguel Sousa');
 assert(manifest.authorUrl === 'https://github.com/MightyCrumbs', 'Unexpected authorUrl');
